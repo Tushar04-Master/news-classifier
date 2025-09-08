@@ -1,0 +1,15 @@
+Ignore datasets and large data files
+data/
+**/data/
+
+Ignore saved model files, checkpoints, and logs
+models/
+**/models/
+saved_models/
+**/saved_models/
+training_logs/
+**/training_logs/
+
+Ignore environment files
+.DS_Store
+*.ipynb_checkpoints
