@@ -2,10 +2,10 @@ import streamlit as st
 import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoTokenizer
+import os
 
 # ==============================================================================
-#  STEP 1: DEFINE THE MODEL ARCHITECTURE & CONFIGURATION
-#  This must be the exact same class as the one used for training.
+#  STEP 1: RE-DEFINE THE MODEL ARCHITECTURE
 # ==============================================================================
 
 class NewsClassifier(nn.Module):
@@ -20,80 +20,60 @@ class NewsClassifier(nn.Module):
         logits = self.classifier(cls_token_hidden_state)
         return logits
 
+# ==============================================================================
+#  STEP 2: LOAD THE MODEL AND TOKENIZER (with Caching)
+# ==============================================================================
+
 # --- Configuration ---
 NUM_CLASSES = 4
-MODEL_PATH = "/Users/tushar04master/Documents/news-classifier/models/saved_models/distilbert_ag_news_classifier.pth"
+# THIS IS THE CRUCIAL FIX: Use a relative path, not an absolute one.
+MODEL_PATH = "models/saved_models/distilbert_ag_news_classifier.pth"
 TOKENIZER_NAME = "distilbert-base-uncased"
 ID_TO_LABEL = {0: "World", 1: "Sports", 2: "Business", 3: "Sci/Tech"}
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-
-# ==============================================================================
-#  STEP 2: LOAD THE TRAINED ASSETS (MODEL & TOKENIZER)
-#  We use @st.cache_resource to load these only once, making the app fast.
-# ==============================================================================
 
 @st.cache_resource
 def load_model_and_tokenizer():
-    """Loads the saved model and tokenizer."""
+    device = torch.device("cpu") # Run on CPU for inference
+    
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_NAME)
     
-    # Instantiate the model architecture
     model = NewsClassifier(num_classes=NUM_CLASSES)
     
-    # Load the trained weights (the "state_dict")
-    # Use map_location to ensure the model loads correctly onto the CPU if no GPU is available
+    # We must check the existence of the file *before* trying to load it.
+    if not os.path.exists(MODEL_PATH):
+        st.error(f"Model file not found at '{MODEL_PATH}'. Make sure it was correctly pushed to your GitHub repository with Git LFS.")
+        return None, None
+
     model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-    
-    # Move the model to the correct device
     model.to(device)
-    
-    # Set the model to evaluation mode
     model.eval()
-    
     return model, tokenizer
 
-# Load the assets
 model, tokenizer = load_model_and_tokenizer()
 
 # ==============================================================================
-#  STEP 3: CREATE THE USER INTERFACE (UI)
+#  STEP 3: CREATE THE USER INTERFACE
 # ==============================================================================
 
 st.title("📰 AG News Category Classifier")
 st.markdown("Enter a news headline below to classify it into one of four categories: World, Sports, Business, or Sci/Tech.")
 
-# Create a text area for user input
-user_input = st.text_area("News Headline:", "Apple's stock hits a new high after the WWDC event.", height=100)
+user_input = st.text_area("News Headline:", "The US economy shows signs of recovery as the stock market rallies.")
 
-# Create a button to trigger the classification
 if st.button("Classify"):
-    if user_input:
-        # ==============================================================================
-        #  STEP 4: MAKE A PREDICTION WHEN THE BUTTON IS CLICKED
-        # ==============================================================================
+    if model is not None and tokenizer is not None and user_input:
+        # --- Preprocess ---
+        inputs = tokenizer(user_input, return_tensors="pt", truncation=True, padding=True)
         
-        # Preprocess the text
-        inputs = tokenizer(
-            user_input, 
-            return_tensors="pt", 
-            truncation=True, 
-            padding=True,
-            max_length=256 # Use same max_length as training
-        )
-        
-        # Move inputs to the correct device
-        input_ids = inputs["input_ids"].to(device)
-        attention_mask = inputs["attention_mask"].to(device)
-        
-        # Make a prediction
+        # --- Predict ---
         with torch.no_grad():
-            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            outputs = model(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"])
         
-        # Post-process the output
+        # --- Post-process ---
         predicted_id = torch.argmax(outputs, dim=1).item()
         predicted_label = ID_TO_LABEL[predicted_id]
         
-        # Display the result
         st.success(f"Predicted Category: **{predicted_label}**")
-    else:
-        st.warning("Please enter a news headline.")
+    elif not user_input:
+        st.warning("Please enter a headline.")
+
