@@ -111,7 +111,7 @@ ptyprocess==0.7.0
 pure_eval==0.2.3
 pyarrow==21.0.0
 pycparser==2.22
-Pygments==2.19.2
+Pygments==2.19.0
 pyparsing==3.2.3
 python-dateutil==2.9.0.post0
 python-json-logger==3.3.0
@@ -170,3 +170,4 @@ widgetsnbextension==4.0.14
 wrapt==1.17.3
 xxhash==3.5.0
 yarl==1.20.1
+
