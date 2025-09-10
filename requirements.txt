@@ -1,14 +1,6 @@
-Web App Framework
 streamlit
-
-PyTorch (CPU version is sufficient for inference)
 torch
 torchvision
 torchaudio
-
-Hugging Face Transformers
 transformers
 tokenizers
-
-For file paths
-os-sys
